@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nuudesk - Studio v1.4</title>
+    <title>Nuudesk - Studio v1.5</title>
     <link id="app-manifest" rel="manifest" href="" />
 
     <script src="https://cdn.jsdelivr.net/npm/uuid@8.3.2/dist/umd/uuidv4.min.js"></script>
@@ -246,6 +246,17 @@
             background: transparent !important;
             padding-left: 0;
         }
+        
+        /* Glassmorphism for Focus Header */
+        .glass-btn {
+            background: rgba(255, 255, 255, 0.15) !important;
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: white !important;
+        }
+        .glass-btn:hover {
+            background: rgba(255, 255, 255, 0.3) !important;
+        }
     </style>
 </head>
 
@@ -262,7 +273,7 @@
                     </div>
                     <div class="text-center">
                         <h2 class="text-lg font-bold text-[var(--el-text-color-primary)] tracking-wide">NUUDESK</h2>
-                        <p class="text-xs text-[var(--el-text-color-secondary)] mt-1 font-mono">Loading Studio v1.4...</p>
+                        <p class="text-xs text-[var(--el-text-color-secondary)] mt-1 font-mono">Loading Studio v1.5...</p>
                     </div>
                     <div class="w-32 h-1 bg-[var(--el-fill-color-dark)] rounded-full overflow-hidden mt-4">
                         <div class="h-full bg-brand animate-pulse w-full"></div>
@@ -278,7 +289,7 @@
                     <span v-else class="font-black text-[9px] tracking-tighter">Nuu</span>
                 </div>
                 <div class="flex items-baseline gap-2">
-                    <h1 class="text-xs font-bold text-[var(--el-text-color-primary)] uppercase tracking-wide">Nuudesk <span class="text-[var(--el-text-color-secondary)] font-normal text-[9px] ml-1">v1.4</span></h1>
+                    <h1 class="text-xs font-bold text-[var(--el-text-color-primary)] uppercase tracking-wide">Nuudesk <span class="text-[var(--el-text-color-secondary)] font-normal text-[9px] ml-1">v1.5</span></h1>
                     <div class="text-[9px] text-[var(--el-text-color-placeholder)] font-mono">
                         SYNC: <span :class="githubConfigured ? 'text-green-500' : 'text-red-500'">{{ githubConfigured ? 'ON' : 'OFF' }}</span>
                     </div>
@@ -417,15 +428,6 @@
                          <el-button v-if="activeFocusTask.itemType === 'task'" circle size="small" @click="quickStartTimer(activeFocusTask)">
                              <el-icon class="text-[var(--el-text-color-secondary)] hover:text-brand"><timer /></el-icon>
                          </el-button>
-                         <el-dropdown trigger="click">
-                            <el-button circle size="small"><el-icon><more-filled /></el-icon></el-button>
-                            <template #dropdown>
-                                <el-dropdown-menu>
-                                    <el-dropdown-item @click="cloneTask(activeFocusTask)">Clone</el-dropdown-item>
-                                    <el-dropdown-item class="!text-red-500" @click="quickDeleteTask(activeFocusTask.id)">Delete</el-dropdown-item>
-                                </el-dropdown-menu>
-                            </template>
-                        </el-dropdown>
                     </div>
 
                 </div>
@@ -466,6 +468,26 @@
                     <div class="w-full h-full overflow-y-auto custom-scrollbar">
                         
                         <div class="h-40 w-full bg-gradient-to-b from-[var(--el-fill-color-darker)] to-[var(--el-bg-color-page)] border-b border-[var(--el-border-color-lighter)] relative">
+                            
+                            <div class="absolute top-4 right-4 z-20 flex gap-2">
+                                <el-tooltip content="Edit Details" placement="bottom">
+                                    <el-button circle size="small" class="glass-btn" @click="editTask(activeFocusTask)">
+                                        <el-icon><edit /></el-icon>
+                                    </el-button>
+                                </el-tooltip>
+                                <el-dropdown trigger="click" @command="handleFocusCommand">
+                                    <el-button circle size="small" class="glass-btn">
+                                        <el-icon><more /></el-icon>
+                                    </el-button>
+                                    <template #dropdown>
+                                        <el-dropdown-menu>
+                                            <el-dropdown-item command="clone"><el-icon><copy-document /></el-icon> Clone</el-dropdown-item>
+                                            <el-dropdown-item divided command="delete" class="!text-red-500"><el-icon><delete /></el-icon> Delete</el-dropdown-item>
+                                        </el-dropdown-menu>
+                                    </template>
+                                </el-dropdown>
+                            </div>
+
                             <div class="max-w-3xl mx-auto h-full flex flex-col justify-end px-8 pb-4 relative">
                                 <div class="w-16 h-16 rounded-md bg-[var(--el-bg-color)] shadow-sm border border-[var(--el-border-color-lighter)] flex items-center justify-center text-3xl absolute -bottom-8 left-8 z-10">
                                     <span v-if="activeFocusTask.itemType === 'note'">📒</span>
@@ -1052,9 +1074,12 @@
                                     <div class="text-xs font-medium">Service Worker</div>
                                     <div class="text-[9px]" :class="swRegistered ? 'text-green-500' : 'text-orange-500'">{{ swRegistered ? 'Active' : 'Inactive (HTTPS Required)' }}</div>
                                  </div>
-                                 <el-button size="small" @click="requestNotificationPerm" :disabled="notificationPermGranted">
-                                    {{ notificationPermGranted ? 'Enabled' : 'Enable' }}
-                                 </el-button>
+                                 <div class="flex gap-2">
+                                     <el-button size="small" link type="primary" @click="sendTestPush">Test Push</el-button>
+                                     <el-button size="small" @click="requestNotificationPerm" :disabled="notificationPermGranted">
+                                        {{ notificationPermGranted ? 'Enabled' : 'Enable' }}
+                                     </el-button>
+                                 </div>
                              </div>
                              <p class="text-[9px] text-[var(--el-text-color-secondary)] mt-1">
                                 Enables focus timer alerts and daily briefing (9:00 AM) if the app is open in background.
@@ -1318,6 +1343,10 @@
                     }
                 };
 
+                const sendTestPush = () => {
+                    sendPushNotification("Test Notification", "System alerts are working correctly.");
+                };
+
                 const toggleTheme = () => {
                     appSettings.theme = appSettings.theme === 'dark' ? 'light' : 'dark';
                     applyTheme();
@@ -1359,6 +1388,15 @@
 
                 const closeFocusMode = () => {
                     activeFocusTask.value = null;
+                };
+                
+                const handleFocusCommand = (cmd) => {
+                    if (cmd === 'clone' && activeFocusTask.value) {
+                        cloneTask(activeFocusTask.value);
+                    }
+                    if (cmd === 'delete' && activeFocusTask.value) {
+                        quickDeleteTask(activeFocusTask.value.id, true);
+                    }
                 };
 
                 const saveFocusTask = async () => {
@@ -1631,6 +1669,12 @@
                         await saveFile('PM_Dashboard/tasks.json', updated, 'tasks');
                         showTaskModal.value = false;
                         ElMessage.success("Item Saved");
+                        
+                        // If we edited the currently focused task, update the reference
+                        if(editingTask.value && activeFocusTask.value && activeFocusTask.value.id === taskForm.id) {
+                            activeFocusTask.value = {...taskForm};
+                        }
+
                     } catch(e) { ElMessage.error(e.message); }
                     loading.value = false;
                 };
@@ -1905,10 +1949,10 @@
                     openTaskModal, editTask, saveTask, createProject, deleteProject, createTag, deleteTag,
                     saveSettings, wipeRemoteData, clearStoredCredentials, handleFileUpload, removeFile,
                     changeMonth, getTasksForDate, getProjectName, getProjectTypeColor, getTagName, getTagIcon, getProjectStats,
-                    handleImgError, toggleStatus, toggleFocusMode, closeFocusMode, saveFocusTask,
+                    handleImgError, toggleStatus, toggleFocusMode, closeFocusMode, saveFocusTask, handleFocusCommand,
                     goToToday,
                     requestNotificationPerm, startSmartTimer, stopTimer, toggleTimerPause, formatTime, quickStartTimer,
-                    cloneTask, quickDeleteTask, swRegistered
+                    cloneTask, quickDeleteTask, swRegistered, sendTestPush
                 };
             }
         });
@@ -1917,4 +1961,4 @@
         app.mount('#app');
     </script>
 </body>
-  </html>
+                     </html>
