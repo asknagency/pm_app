@@ -1,12 +1,16 @@
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563EB">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
     <title>Nuudesk - Studio v1.5</title>
-    <link id="app-manifest" rel="manifest" href="" />
+    
+    <link rel="manifest" href="./manifest.json" />
 
     <script src="https://cdn.jsdelivr.net/npm/uuid@8.3.2/dist/umd/uuidv4.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -80,6 +84,7 @@
             overflow: hidden; 
             font-size: 13px;
             transition: background-color 0.3s, color 0.3s;
+            overscroll-behavior: none; /* Prevents pull-to-refresh on mobile */
         }
 
         .dashboard-card {
@@ -1066,7 +1071,7 @@
                                 </div>
                                 <el-input v-model="appSettings.appIcon" placeholder="https://..." size="small" class="flex-1"></el-input>
                             </div>
-                            <p class="text-[9px] text-[var(--el-text-color-secondary)] mt-1">Updates <code>settings.json</code> & <code>manifest.json</code>.</p>
+                            <p class="text-[9px] text-[var(--el-text-color-secondary)] mt-1">Updates <code>settings.json</code>.</p>
                         </div>
                         <div>
                              <div class="text-[10px] text-[var(--el-text-color-secondary)] mb-1 font-bold">Push Notifications</div>
@@ -1104,26 +1109,6 @@
         const { createApp, ref, reactive, onMounted, computed, watch, nextTick } = Vue;
         const { ElMessage, ElMessageBox, ElNotification } = ElementPlus;
         
-        // --- SERVICE WORKER INJECTION (Dynamic Blob) ---
-        // This creates a virtual "sw.js" file so standard Web Push APIs work.
-        const swCode = `
-            self.addEventListener('install', (e) => self.skipWaiting());
-            self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
-            
-            // Listen for notification clicks
-            self.addEventListener('notificationclick', (event) => {
-                event.notification.close();
-                event.waitUntil(
-                    clients.matchAll({ type: 'window' }).then((clientList) => {
-                        for (const client of clientList) {
-                            if (client.url && 'focus' in client) return client.focus();
-                        }
-                        if (clients.openWindow) return clients.openWindow('/');
-                    })
-                );
-            });
-        `;
-
         const app = createApp({
             setup() {
                 // State
@@ -1170,7 +1155,7 @@
                 const tags = ref([]); 
                 const files = ref([]); 
                 const appSettings = reactive({ theme: 'dark', appIcon: '' });
-                const fileSHAs = reactive({ projects: null, tasks: null, tags: null, settings: null, files: null, manifest: null });
+                const fileSHAs = reactive({ projects: null, tasks: null, tags: null, settings: null, files: null });
 
                 // --- CDN ICON LIBRARY (SimpleIcons) ---
                 const availableIcons = ref([
@@ -1312,14 +1297,11 @@
                 const registerServiceWorker = async () => {
                     if ('serviceWorker' in navigator) {
                         try {
-                            const blob = new Blob([swCode], { type: 'application/javascript' });
-                            const swUrl = URL.createObjectURL(blob);
-                            await navigator.serviceWorker.register(swUrl);
+                            const reg = await navigator.serviceWorker.register('./sw.js');
                             swRegistered.value = true;
-                            console.log('SW Registered');
+                            console.log('SW Registered', reg);
                         } catch (error) {
                             console.error('SW Registration failed:', error);
-                            // Fallback for file:// protocol or insecure context
                             swRegistered.value = false;
                         }
                     }
@@ -1514,26 +1496,6 @@
                     });
                 };
                 
-                const updateManifestLink = () => {
-                    const manifest = {
-                        name: "Nuudesk",
-                        short_name: "Nuudesk",
-                        display: "standalone",
-                        start_url: ".",
-                        background_color: "#1a1a1a",
-                        theme_color: "#2563EB",
-                        icons: [{
-                            src: appSettings.appIcon || 'https://cdn.simpleicons.org/googleearth/2563EB',
-                            sizes: "192x192",
-                            type: "image/png"
-                        }]
-                    };
-                    const stringManifest = JSON.stringify(manifest);
-                    const blob = new Blob([stringManifest], {type: 'application/json'});
-                    const manifestURL = URL.createObjectURL(blob);
-                    document.querySelector('#app-manifest').setAttribute('href', manifestURL);
-                };
-
                 // --- GitHub API ---
                 const ghApi = async (path, method = 'GET', body = null) => {
                     const url = `https://api.github.com/repos/${ghSettings.owner}/${ghSettings.repo}/contents/${path}`;
@@ -1554,7 +1516,7 @@
                     }
                     loading.value = true;
                     try {
-                        const fileList = ['projects', 'tasks', 'tags', 'settings', 'files', 'manifest'];
+                        const fileList = ['projects', 'tasks', 'tags', 'settings', 'files'];
                         await Promise.all(fileList.map(async (file) => {
                             try {
                                 const res = await ghApi(`PM_Dashboard/${file}.json`);
@@ -1570,12 +1532,10 @@
                                     if(file === 'settings') {
                                         Object.assign(appSettings, content);
                                         applyTheme();
-                                        updateManifestLink();
                                     }
                                 } else if (res.status === 404) {
                                     let defaultData = [];
                                     if(file === 'settings') defaultData = { theme: 'dark', appIcon: '' };
-                                    if(file === 'manifest') defaultData = { name: "Nuudesk", icons: [] };
                                     await saveFile(`PM_Dashboard/${file}.json`, defaultData, file);
                                 }
                             } catch(e) { console.error(e); }
@@ -1786,23 +1746,6 @@
                     localStorage.setItem('gh_repo', ghSettings.repo);
                     
                     await saveFile('PM_Dashboard/settings.json', appSettings, 'settings');
-                    
-                    const manifest = {
-                        name: "Nuudesk",
-                        short_name: "Nuudesk",
-                        display: "standalone",
-                        start_url: ".",
-                        background_color: "#1a1a1a",
-                        theme_color: "#2563EB",
-                        icons: [{
-                            src: appSettings.appIcon || 'https://cdn.simpleicons.org/googleearth/2563EB',
-                            sizes: "192x192",
-                            type: "image/png"
-                        }]
-                    };
-                    await saveFile('PM_Dashboard/manifest.json', manifest, 'manifest');
-                    
-                    updateManifestLink();
                     showSettingsModal.value = false;
                     initDashboard();
                 };
@@ -1967,4 +1910,4 @@
         app.mount('#app');
     </script>
 </body>
-    </html>
+</html>
