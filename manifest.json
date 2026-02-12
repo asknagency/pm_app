@@ -1,12 +1,10 @@
 {
   "name": "Nuudesk Studio",
   "short_name": "Nuudesk",
-  "description": "Project Management Dashboard",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#1e293b",
+  "background_color": "#0f172a",
   "theme_color": "#2563EB",
-  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "https://cdn.simpleicons.org/googleearth/2563EB",
@@ -18,5 +16,6 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "permissions": ["notifications"]
 }
