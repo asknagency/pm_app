@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="description" content="Nuudesk Project Management Studio">
     
-    <title>Nuudesk - Studio v1.7 (Pro)</title>
+    <title>Nuudesk - Studio v1.8 (Pro)</title>
     
     <link rel="manifest" href="./manifest.json" />
 
@@ -186,7 +186,7 @@
                     <img v-else src="./icon.png" class="w-full h-full object-cover" />
                 </div>
                 <div class="flex items-baseline gap-2">
-                    <h1 class="text-xs font-bold text-[var(--el-text-color-primary)] uppercase tracking-wide">Nuudesk <span class="text-[var(--el-text-color-secondary)] font-normal text-[9px] ml-1">v1.7</span></h1>
+                    <h1 class="text-xs font-bold text-[var(--el-text-color-primary)] uppercase tracking-wide">Nuudesk <span class="text-[var(--el-text-color-secondary)] font-normal text-[9px] ml-1">v1.8</span></h1>
                     <div class="text-[9px] font-mono flex items-center gap-1">
                         <span v-if="!isOffline && githubConfigured" class="text-green-500">ONLINE</span>
                         <span v-else-if="!isOffline && !githubConfigured" class="text-orange-500">LOCAL</span>
@@ -345,7 +345,7 @@
                 <transition name="focus">
                 <div v-if="activeFocusTask" class="flex-1 overflow-hidden flex flex-col bg-[var(--el-bg-color-page)] relative">
                     <div class="w-full h-full overflow-y-auto custom-scrollbar">
-                        <div class="h-40 w-full bg-gradient-to-b from-[var(--el-fill-color-darker)] to-[var(--el-bg-color-page)] border-b border-[var(--el-border-color-lighter)] relative">
+                        <div class="h-24 w-full bg-gradient-to-b from-[var(--el-fill-color-darker)] to-[var(--el-bg-color-page)] border-b border-[var(--el-border-color-lighter)] relative shrink-0">
                             <div class="absolute top-4 right-4 z-20 flex gap-2">
                                 <el-tooltip content="Edit Details" placement="bottom">
                                     <el-button circle size="small" class="glass-btn" @click="editTask(activeFocusTask)">
@@ -363,7 +363,7 @@
                                 </el-dropdown>
                             </div>
                             <div class="max-w-3xl mx-auto h-full flex flex-col justify-end px-8 pb-4 relative">
-                                <div class="w-16 h-16 rounded-md bg-[var(--el-bg-color)] shadow-sm border border-[var(--el-border-color-lighter)] flex items-center justify-center text-3xl absolute -bottom-8 left-8 z-10">
+                                <div class="w-12 h-12 rounded-md bg-[var(--el-bg-color)] shadow-sm border border-[var(--el-border-color-lighter)] flex items-center justify-center text-2xl absolute -bottom-6 left-8 z-10">
                                     <span v-if="activeFocusTask.itemType === 'note'">📒</span>
                                     <span v-else-if="activeFocusTask.itemType === 'idea'">💡</span>
                                     <span v-else>✅</span>
@@ -371,7 +371,7 @@
                             </div>
                         </div>
 
-                        <div class="max-w-3xl mx-auto w-full pt-12 px-8 pb-32">
+                        <div class="max-w-3xl mx-auto w-full pt-10 px-8 pb-32">
                             <input v-model="activeFocusTask.title" class="text-4xl font-extrabold bg-transparent border-none outline-none text-[var(--el-text-color-primary)] placeholder-[var(--el-text-color-placeholder)] w-full mb-6 leading-tight" placeholder="Untitled" @blur="saveFocusTask" />
 
                             <div class="text-xs text-[var(--el-text-color-regular)] doc-property-grid mb-8">
@@ -780,7 +780,7 @@
                                      <el-button size="small" @click="requestNotificationPerm" :disabled="notificationPermGranted">{{ notificationPermGranted ? 'Enabled' : 'Enable' }}</el-button>
                                  </div>
                              </div>
-                             <p class="text-[9px] text-[var(--el-text-color-secondary)] mt-1">Enables alerts for task due times and daily briefings.</p>
+                             <p class="text-[9px] text-[var(--el-text-color-secondary)] mt-1">Enables alerts for task due times even if app is closed (supported browsers).</p>
                         </div>
                     </div>
                 </el-tab-pane>
@@ -934,6 +934,8 @@
                         try {
                             const reg = await navigator.serviceWorker.register('./sw.js');
                             swRegistered.value = true;
+                            // Initial sync of scheduled tasks
+                            scheduleBackgroundNotifications();
                         } catch (error) { console.error('SW Registration failed:', error); swRegistered.value = false; }
                     }
                 };
@@ -976,26 +978,48 @@
                     viewDate.value = d;
                 };
 
+                const scrollToDate = (dateStr) => {
+                    // Helper to scroll timeline to a specific date
+                    if(viewMode.value !== 'timeline') return;
+                    nextTick(() => {
+                        const container = document.getElementById('timelineScrollContainer');
+                        const el = document.getElementById('day-' + dateStr);
+                        if(container && el) {
+                            const scrollLeft = el.offsetLeft - (container.clientWidth / 2) + (el.clientWidth / 2);
+                            container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+                            el.classList.add('flash-highlight');
+                            setTimeout(() => el.classList.remove('flash-highlight'), 1500);
+                        }
+                    });
+                }
+
                 const goToToday = () => {
                     const now = new Date();
                     viewDate.value = new Date(now.getFullYear(), now.getMonth(), 1); 
-                    if(viewMode.value === 'timeline') {
-                        const todayStr = toDateStr(now);
-                        nextTick(() => {
-                            const container = document.getElementById('timelineScrollContainer');
-                            const el = document.getElementById('day-' + todayStr);
-                            if(container && el) {
-                                const scrollLeft = el.offsetLeft - (container.clientWidth / 2) + (el.clientWidth / 2);
-                                container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
-                                el.classList.add('flash-highlight');
-                                setTimeout(() => el.classList.remove('flash-highlight'), 1500);
-                            }
-                        });
-                    }
+                    scrollToDate(toDateStr(now));
                 };
 
                 const toggleFocusMode = (task) => { activeFocusTask.value = task; };
-                const closeFocusMode = () => { activeFocusTask.value = null; };
+                
+                const closeFocusMode = () => {
+                    if(activeFocusTask.value && activeFocusTask.value.date) {
+                        const dateToScroll = activeFocusTask.value.date;
+                        // Check if we need to switch month view
+                        const taskDate = new Date(dateToScroll);
+                        const currentViewDate = viewDate.value;
+                        
+                        if(taskDate.getMonth() !== currentViewDate.getMonth() || taskDate.getFullYear() !== currentViewDate.getFullYear()) {
+                            viewDate.value = new Date(taskDate.getFullYear(), taskDate.getMonth(), 1);
+                        }
+
+                        activeFocusTask.value = null;
+                        
+                        // Scroll back to the specific day
+                        scrollToDate(dateToScroll);
+                    } else {
+                        activeFocusTask.value = null;
+                    }
+                };
                 
                 const handleFocusCommand = (cmd) => {
                     if (cmd === 'clone' && activeFocusTask.value) cloneTask(activeFocusTask.value);
@@ -1006,6 +1030,7 @@
                     if(!activeFocusTask.value) return;
                     const updated = tasks.value.map(t => t.id === activeFocusTask.value.id ? {...activeFocusTask.value} : t);
                     tasks.value = updated;
+                    scheduleBackgroundNotifications(); // Re-calc notifications
                     await saveFile('PM_Dashboard/tasks.json', updated, 'tasks');
                 };
 
@@ -1133,6 +1158,7 @@
                         }));
                         isAppLoading.value = false;
                         ElMessage.success("Synced");
+                        scheduleBackgroundNotifications();
                     } catch (e) {
                         isAppLoading.value = false;
                         ElMessage.error("Sync Failed");
@@ -1212,6 +1238,7 @@
                         : [...tasks.value, {...taskForm}];
 
                     tasks.value = updated; // Update state immediately
+                    scheduleBackgroundNotifications(); // Re-calc notifications
                     await saveFile('PM_Dashboard/tasks.json', updated, 'tasks');
                     
                     showTaskModal.value = false;
@@ -1349,68 +1376,55 @@
                 };
 
                 // --- Background Services & Notification Logic ---
-                let dailyBriefingSent = false;
-                const notifiedEvents = new Set(); // Prevent duplicate alerts for specific task triggers
+                // We now offload the scheduling to the Service Worker via messages
+                const scheduleBackgroundNotifications = () => {
+                    if (!swRegistered.value || !('serviceWorker' in navigator) || Notification.permission !== "granted") return;
+                    
+                    const notificationQueue = [];
+                    const now = Date.now();
 
-                const checkBackgroundTasks = () => {
-                    const now = new Date();
-                    const hours = now.getHours();
-                    const mins = now.getMinutes();
-
-                    // 1. Daily Briefing (9 AM)
-                    if (hours === 9 && mins === 0 && !dailyBriefingSent) {
-                        const dueToday = notificationList.value.filter(t => !t.isOverdue).length;
-                        if (dueToday > 0) sendPushNotification("Good Morning ☀️", `You have ${dueToday} tasks scheduled for today.`);
-                        dailyBriefingSent = true;
-                    }
-                    if (hours === 9 && mins > 0) dailyBriefingSent = false;
-
-                    // 2. Specific Task Time Notifications
                     tasks.value.forEach(task => {
                         if (task.status === 'done' || !task.startTime || !task.endTime) return;
-
-                        // Combine Date string (YYYY-MM-DD) with Time (HH:mm)
-                        // Note: task.date might be "2024-05-10", start "10:00"
+                        
                         const startDateStr = `${task.date}T${task.startTime}:00`;
                         const endDateStr = `${task.date}T${task.endTime}:00`;
                         
                         const startObj = new Date(startDateStr);
                         const endObj = new Date(endDateStr);
-
-                        // If invalid dates, skip
+                        
                         if(isNaN(startObj.getTime()) || isNaN(endObj.getTime())) return;
 
                         const taskPeriodMs = endObj.getTime() - startObj.getTime();
-                        if (taskPeriodMs <= 0) return; // Invalid range
+                        if (taskPeriodMs <= 0) return;
 
                         const halfPeriodMs = taskPeriodMs / 2;
-                        const prepTimeObj = new Date(startObj.getTime() - halfPeriodMs);
-                        const wrapUpTimeObj = new Date(endObj.getTime() - 60000); // 1 minute before end
+                        const prepTime = startObj.getTime() - halfPeriodMs;
+                        const wrapUpTime = endObj.getTime() - 60000;
 
-                        // A helper to check if "now" is within the same minute as "targetTime"
-                        const isTimeMatch = (target) => {
-                             // Check if we are in the same minute
-                             const diff = Math.abs(now.getTime() - target.getTime());
-                             return diff < 60000 && now.getMinutes() === target.getMinutes();
+                        // Only schedule future notifications
+                        if (prepTime > now) {
+                            notificationQueue.push({
+                                title: `Upcoming: ${task.title}`,
+                                body: `Starting at ${task.startTime}. Get ready!`,
+                                timestamp: prepTime
+                            });
                         }
+                        
+                        if (wrapUpTime > now) {
+                            notificationQueue.push({
+                                title: `Almost Done?`,
+                                body: `Time is up for "${task.title}" at ${task.endTime}.`,
+                                timestamp: wrapUpTime
+                            });
+                        }
+                    });
 
-                        // Check Logic 1: Halfway before start
-                        if (isTimeMatch(prepTimeObj)) {
-                            const eventKey = `${task.id}_prep`;
-                            if (!notifiedEvents.has(eventKey)) {
-                                sendPushNotification(`Upcoming: ${task.title}`, `Starting at ${task.startTime}. Get ready!`);
-                                notifiedEvents.add(eventKey);
-                            }
-                        }
-
-                        // Check Logic 2: 1 Minute before end
-                        if (isTimeMatch(wrapUpTimeObj)) {
-                            const eventKey = `${task.id}_wrapup`;
-                            if (!notifiedEvents.has(eventKey)) {
-                                sendPushNotification(`Almost Done?`, `Time is up for "${task.title}" at ${task.endTime}.`);
-                                notifiedEvents.add(eventKey);
-                            }
-                        }
+                    // Send the entire queue to the SW to handle via TimestampTrigger or Interval
+                    navigator.serviceWorker.ready.then((registration) => {
+                         registration.active?.postMessage({
+                            type: 'SCHEDULE_NOTIFICATIONS',
+                            payload: notificationQueue
+                         });
                     });
                 };
 
@@ -1425,9 +1439,6 @@
                     window.addEventListener('online', updateOnlineStatus);
                     window.addEventListener('offline', updateOnlineStatus);
                     initDashboard();
-                    
-                    // Background loop (runs even if tab is in background on desktop)
-                    setInterval(checkBackgroundTasks, 60000); 
                 });
 
                 return {

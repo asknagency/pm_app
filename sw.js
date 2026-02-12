@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nuudesk-v1.7-offline';
+const CACHE_NAME = 'nuudesk-v1.8-offline';
 const ASSETS_TO_CACHE = [
     './index.html',
     './manifest.json',
@@ -43,7 +43,7 @@ self.addEventListener('activate', (event) => {
 
 // Fetch Event: Stale-While-Revalidate Strategy
 self.addEventListener('fetch', (event) => {
-    // Ignore GitHub API calls for caching (handled by app logic)
+    // Ignore GitHub API calls for caching
     if (event.request.url.includes('api.github.com')) return;
 
     event.respondWith(
@@ -58,7 +58,7 @@ self.addEventListener('fetch', (event) => {
                 }
                 return networkResponse;
             }).catch(() => {
-                // Network failed, nothing to do here as we handle cachedResponse below
+                // Network failed
             });
 
             return cachedResponse || fetchPromise;
@@ -66,21 +66,71 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
-// Notification Handling
+/**
+ * BACKGROUND NOTIFICATION LOGIC
+ * Supports Notification Triggers API for system-scheduled notifications (Android/Chrome).
+ * Falls back to Service Worker interval (unreliable if killed) if triggers aren't supported.
+ */
+
 self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    if (!event.data) return;
+
+    if (event.data.type === 'SHOW_NOTIFICATION') {
+        // Immediate Notification
         const { title, body, icon } = event.data.payload;
         self.registration.showNotification(title, {
             body: body,
-            icon: icon,
+            icon: icon || './icon.png',
             badge: './badge.png',
             vibrate: [200, 100, 200],
             tag: 'nuudesk-alert',
-            renotify: true,
-            data: { dateOfArrival: Date.now() }
+            renotify: true
         });
     }
+
+    if (event.data.type === 'SCHEDULE_NOTIFICATIONS') {
+        // Schedule future notifications
+        const queue = event.data.payload; // Array of {title, body, timestamp}
+        
+        // Check for Notification Triggers support (Chrome Android / Desktop flag)
+        if ('showTrigger' in Notification.prototype) {
+            queue.forEach(item => {
+                self.registration.showNotification(item.title, {
+                    body: item.body,
+                    icon: './icon.png',
+                    badge: './badge.png',
+                    showTrigger: new TimestampTrigger(item.timestamp)
+                });
+            });
+            console.log(`[SW] Scheduled ${queue.length} notifications via Triggers API`);
+        } else {
+            // Fallback: Store in a variable and check periodically inside SW
+            // Note: This only works if browser keeps SW alive or periodic sync wakes it.
+            // Pure client-side PWAs without backend push have limits here.
+            scheduledQueue = queue;
+        }
+    }
 });
+
+let scheduledQueue = [];
+
+// Fallback interval loop (works while browser is open/backgrounded but not killed)
+setInterval(() => {
+    const now = Date.now();
+    scheduledQueue = scheduledQueue.filter(item => {
+        if (item.timestamp <= now) {
+             self.registration.showNotification(item.title, {
+                body: item.body,
+                icon: './icon.png',
+                badge: './badge.png',
+                vibrate: [200, 100, 200],
+                tag: 'nuudesk-scheduled-' + now
+            });
+            return false; // Remove from queue
+        }
+        return true; // Keep in queue
+    });
+}, 10000); // Check every 10 seconds
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
